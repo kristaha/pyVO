@@ -21,6 +21,7 @@ vis.set_estimated_transform(initial_orientation, initial_position)
 grey_img = dl.get_greyscale()
 depth_img = dl.get_depth()
 points_and_response = harris_corners(grey_img)
+print("Harris corners found: " + str(points_and_response))
 tracker.add_new_corners(grey_img, points_and_response)
 
 # Project the points in the first frame

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from skimage import measure 
 from operator import itemgetter
 from typing import Tuple, List
 
@@ -14,13 +15,16 @@ def harris_corners(img: np.ndarray, threshold=1.0, blur_sigma=2.0) -> List[Tuple
     The list is sorted from largest to smallest response value.
     """
     # Applies Gaussian Blur to reduce noice in image
-    img = cv2.GaussianBlur(img, ksize=3, sigmaX=blur_sigma, sigmaY=blur_sigma, BORDER_DEFAULT)
+    img = cv2.GaussianBlur(img, ksize=(3,3), sigmaX=blur_sigma, 
+            sigmaY=blur_sigma, borderType=cv2.BORDER_DEFAULT)
 
     # Finding gradients in x and y direction for input image using Scharr operator
     x_gradient = np.zeros(img.shape)
     y_gradient = np.zeros(img.shape)
-    x_gradient = cv2.Scharr(img, ddepth=-1, dx=1, dy=0, scale=1, delta=0, BORDER_DEFAULT)
-    y_gradient = cv2.Scharr(img, ddepth=-1, dx=0, dy=1, scale=1, delta=0, BORDER_DEFAULT)
+    x_gradient = cv2.Scharr(img, ddepth=-1, dx=1, dy=0, scale=1,
+            delta=0, borderType=cv2.BORDER_DEFAULT)
+    y_gradient = cv2.Scharr(img, ddepth=-1, dx=0, dy=1, scale=1,
+            delta=0, borderType=cv2.BORDER_DEFAULT)
 
 
     # Determine matrix M = (A B, B C)
@@ -32,10 +36,33 @@ def harris_corners(img: np.ndarray, threshold=1.0, blur_sigma=2.0) -> List[Tuple
     b_matrix = x_gradient * y_gradient
     c_matrix = y_gradient * y_gradient
 
-    #TODO Hvordan sette sammen A,B,C til M?
-
-
     # Finding f = det(M) - alpha*trace(M)
+    alpha = 0.06
+    f = np.zeros(img.shape)
+    f = abs((a_matrix*c_matrix - b_matrix*b_matrix) - alpha*(a_matrix + c_matrix) )
+    f = abs((a_matrix*c_matrix - b_matrix*b_matrix) / (a_matrix + c_matrix))
+    #print("f values 1 " + str(f))
 
-    raise NotImplementedError
+    # Filter scores below threshold and nan's
+    is_nan_indices = np.where(np.isnan(f))
+    f[is_nan_indices] = 0
+    below_threshold_indices = f < threshold
+    f[below_threshold_indices] = 0
+    #print("f values 3 " + str(f))
+
+    # Non-maximum suppression - here same as doing max pooling
+    window_size = 4
+    max_values = measure.block_reduce(f, (window_size, window_size), np.max).flatten()
+    max_indices = np.where(np.greater(max_values, 0))[0]
+    max_values = max_values[max_indices]
+    print("Max indices " + str(max_indices))
+    print("Max values " + str(max_values))
+
+    returnList = zip(max_values, max_indices)
+
+    return sorted(returnList, key=itemgetter(0), reverse=True)
+
+
+
+
 
