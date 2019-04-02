@@ -56,6 +56,7 @@ def harris_corners(img: np.ndarray, threshold=1e-2, blur_sigma=2.0) -> List[Tupl
     max_values = measure.block_reduce(f, (window_size, window_size), np.max).flatten()
     max_indices = np.where(np.greater(max_values, 0))[0]
     max_values = max_values[max_indices]
+    max_indices = np.asarray(np.unravel_index(max_indices, img.shape))
     print("Max indices " + str(max_indices))
     print("Max values " + str(max_values))
 
