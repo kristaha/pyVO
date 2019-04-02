@@ -5,7 +5,7 @@ from operator import itemgetter
 from typing import Tuple, List
 
 
-def harris_corners(img: np.ndarray, threshold=1.0, blur_sigma=2.0) -> List[Tuple[float, np.ndarray]]:
+def harris_corners(img: np.ndarray, threshold=1e-2, blur_sigma=2.0) -> List[Tuple[float, np.ndarray]]:
     """
     Return the harris corners detected in the image.
     :param img: The grayscale image.
@@ -38,15 +38,16 @@ def harris_corners(img: np.ndarray, threshold=1.0, blur_sigma=2.0) -> List[Tuple
 
     # Finding f = det(M) - alpha*trace(M)
     alpha = 0.06
+    epsilon = 1e-8
     f = np.zeros(img.shape)
-    f = abs((a_matrix*c_matrix - b_matrix*b_matrix) - alpha*(a_matrix + c_matrix) )
-    f = abs((a_matrix*c_matrix - b_matrix*b_matrix) / (a_matrix + c_matrix))
-    #print("f values 1 " + str(f))
+    f = (a_matrix*c_matrix - b_matrix*b_matrix) - alpha*(a_matrix + c_matrix)**2 
+    #f = (a_matrix*c_matrix - b_matrix*b_matrix) / (a_matrix + c_matrix + epsilon)
+    print("f values 1 " + str(f))
 
     # Filter scores below threshold and nan's
-    is_nan_indices = np.where(np.isnan(f))
-    f[is_nan_indices] = 0
-    below_threshold_indices = f < threshold
+    #is_nan_indices = np.where(np.isnan(f))
+    #f[is_nan_indices] = 0
+    below_threshold_indices = f < 0#threshold
     f[below_threshold_indices] = 0
     #print("f values 3 " + str(f))
 
