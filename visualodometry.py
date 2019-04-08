@@ -22,16 +22,17 @@ grey_img = dl.get_greyscale()
 depth_img = dl.get_depth()
 points_and_response = harris_corners(grey_img)
 print("Harris corners found: " + str(points_and_response))
-tracker.add_new_corners(grey_img, points_and_response)
+#tracker.add_new_corners(grey_img, points_and_response)
 
 # Project the points in the first frame
-previous_ids, previous_points = tracker.get_position_with_id()
-previous_ids, previous_points = project_points(previous_ids, previous_points, depth_img)
-vis.set_projected_points(previous_points, initial_orientation, initial_position)
+#previous_ids, previous_points = tracker.get_position_with_id()
+#previous_ids, previous_points = project_points(previous_ids, previous_points, depth_img)
+#vis.set_projected_points(previous_points, initial_orientation, initial_position)
 
-current_orientation = initial_orientation
-current_position = initial_position
+#current_orientation = initial_orientation
+#current_position = initial_position
 
+"""
 while dl.has_next():
     dl.next()
 
@@ -53,12 +54,11 @@ while dl.has_next():
     #vis.set_projected_points(points, gt_position, gt_orientation)
 
     # Replace lost points
-    #points_and_response = harris_corners(grey_img)
+    points_and_response = harris_corners(grey_img)
     #tracker.add_new_corners(grey_img, points_and_response)
 
     # Find transformation of the new frame
     ## I will push this code to the repo a bit later, as there is still some smaller issues to sort out with it
 
-
-
+"""
 cv2.destroyAllWindows()

@@ -1,2 +1,5 @@
 # Ignore dataset
 dataset/
+
+#Ignore .swp
+*.swp
