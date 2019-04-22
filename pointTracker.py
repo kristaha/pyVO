@@ -78,58 +78,80 @@ class KLTTracker:
         """
 
         # Check if any point of patch is outside of image --> return 1
-        if(self.patchHalfSizeFloored <= self.pos_x or 
-                self.pos_x < img.shape[1] - self.patchHalfSizeFloored) or (
-                self.patchHalfSizeFloored <= self.pos_y or
-                self.pos_y < img.shape[0] - self.patchHalfSizeFloored):
+        if(self.patchHalfSizeFloored >= self.pos_x or 
+                img.shape[1] < self.pos_x + self.patchHalfSizeFloored) or (
+                self.patchHalfSizeFloored >= self.pos_y or
+                img.shape[0] < self.pos_y + self.patchHalfSizeFloored):
             return 1
 
-        # Sets initial delta
-        delta = 0
+        # Sets initial p and translation and rotation step length 
+        p = 0
+        translation_step_length = 1
+        rotation_step_length = 1
 
         # Makes local grid
-        local_grid_size = np.arrange(-self.patchHalfSizeFloored, self.patchHalfSizeFloored)
-        local_theta = []
-        local_grid = []
+        u_grid, v_grid = np.mgrid[-self.patchHalfSizeFloored: self.patchHalfSizeFloored + 1,
+                -self.patchHalfSizeFloored: self.patchHalfSizeFloored + 1]
 
-        for i in range(local_grid_size.shape[0]):
-            for j in range(local_grid_size.shape[0]):
-                local_theta.append(-np.angle([i,j])) # negative since vector should point from origin, not towards
-                local_grid.append([i,j])
-
-
-        local_theta = np.asarray(local_theta)
-        local_grid = np.asarray(local_grid)
+        #print(f"u_grid: {u_grid}")
+        #print(f"v_grid: {v_grid}")
 
         for i in range(max_iterations):
-            warp = get_warped_patch(img, patch_size, local_grid[0], local_grid[1], local_theta) 
-            error = self.trackingPatch - warp
+            img_patch_warp = get_warped_patch(img, self.patchSize, self.pos_x, self.pos_y, self.theta) 
+            error = self.trackingPatch - img_patch_warp
             
-            #Evaluates Jackobian in (x; delta)
-            jacobian = np.asarray([1, 0, -sin(local_theta)*local_grid[0] - cos(local_theta)*local_grid[1]], 
-                    [0, 1, -cos(local_theta)*local_grid[0] - sin(local_theta)*local_grid[1]]) 
-            steepest_descent_direction = img_grad*jacobian 
-            steepest_descent_transpose = np.transpose(steepest_descent_direction)
+            # Evaluates Jackobian in (x; p)
+            jacobians = np.zeros((self.patchSize, self.patchSize, 2, 3))
+            jacobians[:, :, 0, 0] = 1.0
+            jacobians[:, :, 1, 1] = 1.0
+
+            sin_theta = sin(self.theta)
+            cos_theta = cos(self.theta)
+
+            jacobians[:, :, 0, 2] = -sin_theta*u_grid - cos_theta*v_grid
+            jacobians[:, :, 1, 2] = cos_theta*u_grid - sin_theta*v_grid
+
+
+            # Find steepest descent
+            img_patch_grad = get_warped_patch(img_grad, self.patchSize, self.pos_x, self.pos_y, self.theta)
+            steepest_descent_direction = img_patch_grad @ jacobians
+            print(f"Steepest descent direction : {steepest_descent_direction.shape}")
+            steepest_descent_direction_transpose = np.transpose(steepest_descent_direction, (3,0,1,2))
+            print(f"Steepest descent direction transpose : {steepest_descent_direction_transpose.shape}")
+
+            # Find Hessian
+            hessian = np.sum(steepest_descent_direction_transpose @ steepest_descent_direction, axis=1)
+            print(f"Hessian shape: {hessian.shape}")
+
+
+            # Find inverse of Hessian
             try:
-                inverse_hessian = np.linalg.inv(steepest_descent_transpose*steepest_descent_direction)
+                inverse_hessian = np.linalg.inv(hessian)
             except np.linalg.LinAlgError:
                 return 2
 
-            change_delta = inverse_hessian*(steepest_descent_transpose*error)
-            delta = np.add(delta, change_delta)
+            # Find change in p
+            delta_p = inverse_hessian @ np.sum(steepest_descent_transpose @ error, axis=1)
+            print(f"delta_p: {delta_p}")
+            p = np.add(p, delta_p)
+
+            # Update translation and theta
+            self.translationX += translation_step_length*delta_p[0]
+            self.translationY += translation_step_length*delta_p[1]
+            self.theta += rotation_step_length*delta_p[2]
+
 
             # Checks if current length of delta is considered optimal
-            if (np.sqrt(delta.dot(delta)) < min_delta_length):
+            if (np.sqrt(delta_p.dot(delta_p)) < min_delta_length):
                 # Add new point to positionHistory to visualize tracking
                 self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  
                 return 0
 
         # Checks if optimization failed and we have an unsuccessful track 
-        if np.sqrt(delta.dot(delta)) > max_error:
+        if np.sqrt(p.dot(p)) > max_error:
             return 3
 
         # Add new point to positionHistory to visualize tracking
-        #self.theta = np.angle(delta)
         self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  
         return 0
 
