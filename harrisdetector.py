@@ -51,9 +51,10 @@ def harris_corners(img: np.ndarray, threshold=3, blur_sigma=2.0) -> List[Tuple[f
     for e in max_indices:
         row, col = e
         max_values.append((f[row][col], np.asarray([row, col])))
-        cv2.circle(img,(int(col),int(row)),3,(100,100,100),-1) # draw circle
-    cv2.imshow("f_image.png", img)
-    cv2.waitKey(20000)
+        img_copy = img
+        cv2.circle(img_copy,(int(col),int(row)),3,(100,100,100),-1) # draw circle
+    cv2.imshow("f_image.png", img_copy)
+    cv2.waitKey(250)
 
     #print(f"Number of harris points {len(max_values)}")
 

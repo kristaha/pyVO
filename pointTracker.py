@@ -77,11 +77,61 @@ class KLTTracker:
         2 if a invertible hessian is encountered and 3 if the final error is larger than max_error.
         """
 
-        for iteration in range(max_iterations):
-            raise NotImplementedError  # You should try to implement this without using any loops, other than this iteration loop. Otherwise it will be very slow.
+        # Check if any point of patch is outside of image --> return 1
+        if(self.patchHalfSizeFloored <= self.pos_x or 
+                self.pos_x < img.shape[1] - self.patchHalfSizeFloored) or (
+                self.patchHalfSizeFloored <= self.pos_y or
+                self.pos_y < img.shape[0] - self.patchHalfSizeFloored):
+            return 1
 
-        self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  # Add new point to positionHistory to visualize tracking
+        # Sets initial delta
+        delta = 0
 
+        # Makes local grid
+        local_grid_size = np.arrange(-self.patchHalfSizeFloored, self.patchHalfSizeFloored)
+        local_theta = []
+        local_grid = []
+
+        for i in range(local_grid_size.shape[0]):
+            for j in range(local_grid_size.shape[0]):
+                local_theta.append(-np.angle([i,j])) # negative since vector should point from origin, not towards
+                local_grid.append([i,j])
+
+
+        local_theta = np.asarray(local_theta)
+        local_grid = np.asarray(local_grid)
+
+        for i in range(max_iterations):
+            warp = get_warped_patch(img, patch_size, local_grid[0], local_grid[1], local_theta) 
+            error = self.trackingPatch - warp
+            
+            #Evaluates Jackobian in (x; delta)
+            jacobian = np.asarray([1, 0, -sin(local_theta)*local_grid[0] - cos(local_theta)*local_grid[1]], 
+                    [0, 1, -cos(local_theta)*local_grid[0] - sin(local_theta)*local_grid[1]]) 
+            steepest_descent_direction = img_grad*jacobian 
+            steepest_descent_transpose = np.transpose(steepest_descent_direction)
+            try:
+                inverse_hessian = np.linalg.inv(steepest_descent_transpose*steepest_descent_direction)
+            except np.linalg.LinAlgError:
+                return 2
+
+            change_delta = inverse_hessian*(steepest_descent_transpose*error)
+            delta = np.add(delta, change_delta)
+
+            # Checks if current length of delta is considered optimal
+            if (np.sqrt(delta.dot(delta)) < min_delta_length):
+                # Add new point to positionHistory to visualize tracking
+                self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  
+                return 0
+
+        # Checks if optimization failed and we have an unsuccessful track 
+        if np.sqrt(delta.dot(delta)) > max_error:
+            return 3
+
+        # Add new point to positionHistory to visualize tracking
+        #self.theta = np.angle(delta)
+        self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  
+        return 0
 
 class PointTracker:
 
