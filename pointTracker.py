@@ -93,12 +93,11 @@ class KLTTracker:
         u_grid, v_grid = np.mgrid[-self.patchHalfSizeFloored: self.patchHalfSizeFloored + 1,
                 -self.patchHalfSizeFloored: self.patchHalfSizeFloored + 1]
 
-        #print(f"u_grid: {u_grid}")
-        #print(f"v_grid: {v_grid}")
-
         for i in range(max_iterations):
             img_patch_warp = get_warped_patch(img, self.patchSize, self.pos_x, self.pos_y, self.theta) 
             error = self.trackingPatch - img_patch_warp
+            error = error[:, :, np.newaxis, np.newaxis]
+            #print(f"error shape: {error.shape}")
             
             # Evaluates Jackobian in (x; p)
             jacobians = np.zeros((self.patchSize, self.patchSize, 2, 3))
@@ -110,19 +109,17 @@ class KLTTracker:
 
             jacobians[:, :, 0, 2] = -sin_theta*u_grid - cos_theta*v_grid
             jacobians[:, :, 1, 2] = cos_theta*u_grid - sin_theta*v_grid
-
+            #print(f"Jacobian shape: {jacobians.shape}")
 
             # Find steepest descent
             img_patch_grad = get_warped_patch(img_grad, self.patchSize, self.pos_x, self.pos_y, self.theta)
-            steepest_descent_direction = img_patch_grad @ jacobians
-            print(f"Steepest descent direction : {steepest_descent_direction.shape}")
-            steepest_descent_direction_transpose = np.transpose(steepest_descent_direction, (3,0,1,2))
-            print(f"Steepest descent direction transpose : {steepest_descent_direction_transpose.shape}")
+            steepest_descent = img_patch_grad[:, :, np.newaxis] @ jacobians
+            steepest_descent_transpose = np.transpose(steepest_descent, (0,1,3,2))
+            #print(f"steepest_descent_transpose shape: {steepest_descent_transpose.shape}")
 
             # Find Hessian
-            hessian = np.sum(steepest_descent_direction_transpose @ steepest_descent_direction, axis=1)
-            print(f"Hessian shape: {hessian.shape}")
-
+            hessian = np.sum(steepest_descent_transpose @ steepest_descent, axis=(0, 1))
+            #print(f"Hessian shape: {hessian.shape}")
 
             # Find inverse of Hessian
             try:
@@ -131,7 +128,7 @@ class KLTTracker:
                 return 2
 
             # Find change in p
-            delta_p = inverse_hessian @ np.sum(steepest_descent_transpose @ error, axis=1)
+            delta_p = inverse_hessian @ np.sum(steepest_descent_transpose * error, axis=(0,1))
             print(f"delta_p: {delta_p}")
             p = np.add(p, delta_p)
 
@@ -142,13 +139,13 @@ class KLTTracker:
 
 
             # Checks if current length of delta is considered optimal
-            if (np.sqrt(delta_p.dot(delta_p)) < min_delta_length):
+            if (np.sqrt(delta_p[0]**2 + delta_p[1]**2) < min_delta_length):
                 # Add new point to positionHistory to visualize tracking
                 self.positionHistory.append((self.pos_x, self.pos_y, self.theta))  
                 return 0
 
         # Checks if optimization failed and we have an unsuccessful track 
-        if np.sqrt(p.dot(p)) > max_error:
+        if np.sqrt(p[0]**2 + p[1]**2) > max_error:
             return 3
 
         # Add new point to positionHistory to visualize tracking

@@ -3,3 +3,6 @@ dataset/
 
 #Ignore .swp
 *.swp
+
+#Ignore __pycache__
+__pycache__
