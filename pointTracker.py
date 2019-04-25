@@ -25,8 +25,8 @@ def get_warped_patch(img: np.ndarray, patch_size: int,
     s = sin(-theta)
 
     t = np.array([[c, s, (-c - s) * patch_half_size + x_translation],
-                  [-s, c, (s - c) * patch_half_size + y_translation]])
-
+                  [-s, c, (s - c) * patch_half_size + y_translation]], dtype=np.float32)
+    
     return cv2.warpAffine(img, t, (patch_size, patch_size), flags=cv2.WARP_INVERSE_MAP)
 
 
@@ -76,7 +76,7 @@ class KLTTracker:
         :return: Return 0 when track is successful, 1 any point of the tracking patch is outside the image,
         2 if a invertible hessian is encountered and 3 if the final error is larger than max_error.
         """
-
+        #print(f"Position (x,y): ({self.pos_x} , {self.pos_y})")
         # Check if any point of patch is outside of image --> return 1
         if(self.patchHalfSizeFloored >= self.pos_x or 
                 img.shape[1] < self.pos_x + self.patchHalfSizeFloored) or (
@@ -129,7 +129,7 @@ class KLTTracker:
 
             # Find change in p
             delta_p = inverse_hessian @ np.sum(steepest_descent_transpose * error, axis=(0,1))
-            print(f"delta_p: {delta_p}")
+            #print(f"delta_p: {delta_p}")
             p = np.add(p, delta_p)
 
             # Update translation and theta
@@ -163,8 +163,8 @@ class PointTracker:
     def visualize(self, img: np.ndarray, draw_id=False):
         img_vis = cv2.cvtColor((img*255).astype(np.uint8), cv2.COLOR_GRAY2RGB)
         for klt in self.currentTrackers:
-            x_pos = int(round(klt.pos_x))
-            y_pos = int(round(klt.pos_y))
+            x_pos = int(round(klt.pos_x[0]))
+            y_pos = int(round(klt.pos_y[0]))
             length = 20
             x2_pos = int(round(x_pos + length * cos(-klt.theta + pi / 2)))
             y2_pos = int(round(y_pos - length * sin(-klt.theta + pi / 2)))
@@ -175,8 +175,11 @@ class PointTracker:
 
             if len(klt.positionHistory) >= 2:
                 for i in range(len(klt.positionHistory)-1):
-                    x_from, y_from, _ = klt.positionHistory[i]
-                    x_to, y_to, _ = klt.positionHistory[i+1]
+                    x_from = float(klt.positionHistory[i][0])
+                    y_from = float(klt.positionHistory[i][1])
+
+                    x_to = float(klt.positionHistory[i+1][0])
+                    y_to = float(klt.positionHistory[i+1][1])
                     cv2.line(img_vis, (int(round(x_from)), int(round(y_from))), (int(round(x_to)), int(round(y_to))), 0, thickness=1, lineType=cv2.LINE_AA)
 
         cv2.imshow("KLT Trackers", img_vis)
@@ -204,7 +207,7 @@ class PointTracker:
         points = filtered_points
         filtered_points = []
         if len(self.currentTrackers) > 0:  # Filter out points to close to existing points
-            current_points = [np.array([klt.pos_x, klt.pos_y]) for klt in self.currentTrackers]
+            current_points = [np.array([klt.pos_x[0], klt.pos_y[0]]) for klt in self.currentTrackers]
             _, dists = flann.nn(np.array(current_points, dtype=np.int32), np.array(points, dtype=np.int32), 1)
             dists = np.sqrt(dists)
             filter_indices = np.arange(0, len(points))[dists >= min_distance]
