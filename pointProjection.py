@@ -18,11 +18,6 @@ def project_points(ids: np.ndarray, points: np.ndarray, depth_img: np.ndarray) -
     :return: A tuple containing a N vector and a 3xN vector of all the points that where successfully projected.
     """
 
-
-    #print(f"depth img shape: {depth_img.shape}")
-    #print("points:")
-    #print(points)
-
     x_values = []
     y_values = []
     z_values = []
@@ -53,13 +48,13 @@ def project_points(ids: np.ndarray, points: np.ndarray, depth_img: np.ndarray) -
 
         window = depth_img[window_u_start_coordinate : window_u_end_coordinate, 
                 window_v_start_coordinate : window_v_end_coordinate]
+        z = 0
 
-
-        z = np.amin(window) / 5000
-
-        print(f"z value = {z}")
+        if (window.size > 0):
+            z = np.amin(window) / 5000
 
         if z > 0:
+            #print(f"z value = {z}")
             x = (u - cx)*z / fx
             y = (v - cy)*z / fy
             valid_point_ids.append(ids[i])

@@ -5,7 +5,7 @@ from skimage.feature import peak_local_max
 from operator import itemgetter
 from typing import Tuple, List
 
-def harris_corners(img: np.ndarray, threshold=3, blur_sigma=2.0) -> List[Tuple[float, np.ndarray]]:
+def harris_corners(img: np.ndarray, threshold=4.5, blur_sigma=2.0) -> List[Tuple[float, np.ndarray]]:
     """
     Return the harris corners detected in the image.
     :param img: The grayscale image.
@@ -30,38 +30,25 @@ def harris_corners(img: np.ndarray, threshold=3, blur_sigma=2.0) -> List[Tuple[f
     dy2 = cv2.GaussianBlur(dy2, None, sigmaX=blur_sigma, sigmaY=blur_sigma)
     
     # Finding response image f = det(M) / trace(M)
-    #alpha = 0.0
-    #f = (dx2*dy2 - dxdy*dxdy) + alpha*(dx2 + dy2)**2 
-    epsilon = 1e-8
-    f = np.divide(dx2*dy2 - dxdy*dxdy, dx2 + dy2 + epsilon) # Adds the constant epsilon to avoid zero-devision
-    #cv2.imshow("f_image.png", f)
-    #cv2.waitKey(250)
-    #print(f"Max f value = {f.max()}")
+    epsilon = 1e-8 # Added when finding response to avoid zero-devision
+    f = np.divide(dx2*dy2 - dxdy*dxdy, dx2 + dy2 + epsilon)
 
     # Filter scores below threshold
-    #below_threshold_indices = f < threshold
     f[f < threshold] = 0
 
     # Non-maximum suppression 
     window_size = 10
     max_indices = peak_local_max(f, window_size)
-    #print(f"Max indices first: {max_indices[0]}")
 
     max_values = []
     for e in max_indices:
         row, col = e
-        max_values.append((f[row][col], np.asarray([row, col])))
+        #max_values.append((f[row][col], np.asarray([row, col])))
+        max_values.append((f[row][col], np.asarray([col, row])))
         img_copy = img
         cv2.circle(img_copy,(int(col),int(row)),3,(100,100,100),-1) # draw circle
-    cv2.imshow("f_image.png", img_copy)
-    cv2.waitKey(250)
-
-    #print(f"Number of harris points {len(max_values)}")
+    cv2.imshow("harris_corners.png", img_copy)
+    cv2.waitKey(1)
 
     return sorted(max_values, key=itemgetter(0), reverse=True)
-    #return []
-
-
-
-
 
